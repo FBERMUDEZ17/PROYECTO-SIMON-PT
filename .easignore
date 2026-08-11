@@ -1,0 +1,10 @@
+node_modules
+mobile/node_modules
+web/node_modules
+mobile/.expo
+mobile/android
+mobile/ios
+*.apk
+*.aab
+data
+web/.next

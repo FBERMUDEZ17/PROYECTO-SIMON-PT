@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fleet Dashboard",
+  title: "SIMON PT",
   description: "Monitoreo de flota en tiempo real: GPS, combustible y alertas predictivas.",
 };
 

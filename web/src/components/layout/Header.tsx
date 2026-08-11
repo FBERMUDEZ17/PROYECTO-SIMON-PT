@@ -14,7 +14,7 @@ export function Header({ online, wsStatus }: { online: boolean; wsStatus: Connec
   return (
     <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3 dark:border-slate-800 dark:bg-slate-900">
       <div>
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Fleet Dashboard</h1>
+        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">SIMON PT</h1>
         <div className="mt-1 flex gap-3">
           <StatusDot status={online ? "online" : "offline"} label={online ? "En línea" : "Sin conexión"} />
           <StatusDot
