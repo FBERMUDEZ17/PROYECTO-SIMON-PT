@@ -4,7 +4,7 @@ Backend Go que recibe telemetría de vehículos (GPS, combustible, temperatura, 
 
 - 📄 **[DESIGN.md](./DESIGN.md)** — stack elegido y trade-offs técnicos.
 - 🛠️ **[SETUP.md](./SETUP.md)** — cómo levantar todo localmente (backend, web, mobile).
-- 📱 **[Descargar APK Android](https://expo.dev/artifacts/eas/qqr9G7K0Zz4jISvIwE50tIQonjxbQ49xtX1-U1-3-gM.apk)** — instalable directo, sin Expo Go.
+- 📱 **[Descargar APK Android](https://raw.githubusercontent.com/FBERMUDEZ17/PROYECTO-SIMON-PT/main/mobile/builds/simon-pt-preview.apk)** — instalable directo, sin Expo Go.
 
 ## Estructura del repo
 

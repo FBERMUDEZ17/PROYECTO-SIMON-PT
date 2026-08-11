@@ -60,7 +60,7 @@ Abrir `http://localhost:3000`. El login/registro que hagas ahí pega directo con
 
 No requiere Node, Android Studio ni nada instalado. Bajar e instalar directamente en un Android:
 
-**📦 [Descargar APK](https://expo.dev/artifacts/eas/qqr9G7K0Zz4jISvIwE50tIQonjxbQ49xtX1-U1-3-gM.apk)**
+**📦 [Descargar APK](https://raw.githubusercontent.com/FBERMUDEZ17/PROYECTO-SIMON-PT/main/mobile/builds/simon-pt-preview.apk)** (también versionado en el repo: `mobile/builds/simon-pt-preview.apk`)
 
 Al abrir la app por primera vez, tocar **"⚙ Servidor"** en la pantalla de login y poner la URL donde corre el backend:
 - Mismo Wi-Fi que tu backend: `http://<IP-LAN-de-tu-PC>:8080` (ej. `http://192.168.1.56:8080`)
@@ -105,5 +105,6 @@ El perfil `preview` (`mobile/eas.json`) genera un `.apk` instalable directo (no 
 | `JWT_SECRET debe estar definido` al arrancar | Falta la env var | `JWT_SECRET=algo go run ./cmd/server` |
 | Web no puede loguear (CORS) | `FRONTEND_ORIGIN` no incluye tu origen | Setear `FRONTEND_ORIGIN=http://localhost:3000` (o el que uses) |
 | Mobile no conecta al backend | Apuntando a `localhost` desde un dispositivo físico/emulador | Usar la IP LAN de la PC (dispositivo físico) o `10.0.2.2` (emulador Android) |
+| APK da "Network request failed" incluso con la IP LAN bien puesta | Android 9+ (API 28+) bloquea tráfico `http://` sin cifrar por defecto | Ya resuelto en `mobile/app.json` (`android.usesCleartextTraffic: true`) — solo aplica en APKs compilados con esa versión o posterior; si compilás desde un `app.json` viejo, el error vuelve |
 | Expo Go dice "Something went wrong" | `react-native-maps` no soportado en Expo Go | Usar el APK standalone (Opción A) |
 | Expo Go dice "incompatible SDK version" | Tu Expo Go instalado no coincide con la SDK del proyecto (`mobile/app.json` → `expo.sdkVersion` implícito por la versión de `expo` en `package.json`, hoy 54) | Actualizar Expo Go desde la store, o bajar la SDK del proyecto para que coincida |
