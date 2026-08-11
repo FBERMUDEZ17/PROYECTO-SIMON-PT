@@ -33,11 +33,18 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "POST_NOTIFICATIONS"
-      ],
-      "usesCleartextTraffic": true
+      ]
     },
     "plugins": [
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ],
     "notification": {
       "icon": "./assets/notification-icon.png",
