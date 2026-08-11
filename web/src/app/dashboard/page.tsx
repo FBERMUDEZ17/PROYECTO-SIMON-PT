@@ -77,10 +77,12 @@ export default function DashboardPage() {
               {!isLoading && <VehicleListPanel vehicles={vehicles} selectedId={selectedId} onSelect={setSelectedId} />}
             </Card>
 
-            {/* TAREA: "sistema de alertas predictivas (solo admin visible)". */}
+            {/* TAREA: "sistema de alertas predictivas (solo admin visible)".
+                Se acota al vehículo seleccionado (mapa o lista) cuando hay
+                uno — antes siempre mostraba las alertas de toda la flota. */}
             {user?.role === "admin" && (
               <Card title="Alertas predictivas (admin)">
-                <AlertsPanel vehicles={vehicles} />
+                <AlertsPanel vehicles={vehicles} filterVehicleId={selectedId} onClearFilter={() => setSelectedId(null)} />
               </Card>
             )}
           </div>

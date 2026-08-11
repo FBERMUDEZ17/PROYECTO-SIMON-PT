@@ -39,6 +39,11 @@ export interface VehicleAlert {
   created_at: string;
 }
 
+// Mismos umbrales que web/src/types/api.ts — usados para los filtros
+// rápidos y los badges de "combustible bajo"/"exceso de velocidad".
+export const LOW_FUEL_THRESHOLD_HOURS = 1;
+export const HIGH_SPEED_THRESHOLD_KMH = 80;
+
 export interface Vehicle {
   id: string; // enmascarado para no-admin (ej. "DEV-****-XC54")
   name: string;

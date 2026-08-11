@@ -2,7 +2,17 @@
 // combinados: fetch inicial (con fallback a cache SQLite si falla por
 // estar offline), y aplica los eventos WS entrantes en memoria para que la
 // UI se actualice en vivo sin refetch.
-import { useCallback, useEffect, useState } from "react";
+//
+// Convertido a Context (mismo patrón que useAuth.tsx) para que Dashboard,
+// Alertas, el detalle de vehículo y los badges del tab bar comparten una
+// única suscripción WS/fetch en vez de que cada pantalla abra su propio
+// socket — además de ser más eficiente en batería/datos, es lo que
+// permite que VehicleDetailScreen lea el vehículo ya cargado por el
+// listado en vez de volver a pedirlo por id (ver comentario en
+// VehicleDetailScreen.tsx: para no-admin el id ya viene enmascarado y
+// GET /vehicles/{id} con ese id 404 siempre).
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 
 import { listVehicles } from "@/api/vehicles";
 import { NetworkError } from "@/api/client";
@@ -10,7 +20,18 @@ import { cacheVehicles, getCachedVehicles } from "@/storage/vehiclesCache";
 import { useRealtimeSocket } from "./useRealtimeSocket";
 import type { Vehicle, WsEvent } from "@/types/api";
 
-export function useVehicles() {
+interface VehiclesContextValue {
+  vehicles: Vehicle[];
+  loading: boolean;
+  error: string | null;
+  isOffline: boolean;
+  refresh: () => Promise<void>;
+  wsStatus: "idle" | "connecting" | "open" | "closed";
+}
+
+const VehiclesContext = createContext<VehiclesContextValue | null>(null);
+
+export function VehiclesProvider({ children }: { children: ReactNode }) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
@@ -66,5 +87,16 @@ export function useVehicles() {
 
   const { status } = useRealtimeSocket(applyEvent);
 
-  return { vehicles, loading, error, isOffline, refresh, wsStatus: status };
+  const value = useMemo(
+    () => ({ vehicles, loading, error, isOffline, refresh, wsStatus: status }),
+    [vehicles, loading, error, isOffline, refresh, status]
+  );
+
+  return <VehiclesContext.Provider value={value}>{children}</VehiclesContext.Provider>;
+}
+
+export function useVehicles(): VehiclesContextValue {
+  const ctx = useContext(VehiclesContext);
+  if (!ctx) throw new Error("useVehicles debe usarse dentro de <VehiclesProvider>");
+  return ctx;
 }

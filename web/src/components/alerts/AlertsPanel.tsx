@@ -7,21 +7,59 @@ import type { Vehicle } from "@/types/api";
  * componente no valida el rol por sí mismo porque los datos que recibe
  * (recent_alerts) ya vienen del backend, que es quien realmente decide qué
  * exponer según el JWT de la sesión.
+ *
+ * `filterVehicleId`: si hay un vehículo seleccionado en el dashboard, el
+ * panel se acota a sus alertas (antes mostraba siempre las de toda la
+ * flota, incluso con un vehículo puntual seleccionado — confuso al buscar
+ * la causa de una alerta de un vehículo específico). `onClearFilter`
+ * permite volver a ver todas sin tener que deseleccionar el vehículo en el
+ * mapa/lista.
  */
-export function AlertsPanel({ vehicles }: { vehicles: Vehicle[] }) {
-  const alerts = vehicles
+export function AlertsPanel({
+  vehicles,
+  filterVehicleId,
+  onClearFilter,
+}: {
+  vehicles: Vehicle[];
+  filterVehicleId?: string | null;
+  onClearFilter?: () => void;
+}) {
+  const scoped = filterVehicleId ? vehicles.filter((v) => v.id === filterVehicleId) : vehicles;
+
+  const alerts = scoped
     .flatMap((v) => v.recent_alerts.map((a) => ({ ...a, vehicleId: v.id, vehicleName: v.name })))
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
+  const filterBanner = filterVehicleId && (
+    <div className="flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
+      <span>
+        Filtrando por <span className="font-mono">{scoped[0]?.name ?? filterVehicleId}</span>
+      </span>
+      {onClearFilter && (
+        <button type="button" onClick={onClearFilter} className="shrink-0 underline hover:text-slate-700 dark:hover:text-slate-200">
+          Ver todas
+        </button>
+      )}
+    </div>
+  );
+
   if (alerts.length === 0) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Sin alertas activas.</p>;
+    return (
+      <div className="flex flex-col gap-2">
+        {filterBanner}
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          {filterVehicleId ? "Este vehículo no tiene alertas activas." : "Sin alertas activas."}
+        </p>
+      </div>
+    );
   }
 
   // TAREA (mejora UX): agrupar por vehículo — con una flota más grande, el
   // mismo vehículo genera varias alertas seguidas (velocidad, combustible)
   // y listarlas todas sueltas hace que un solo vehículo problemático tape
   // el resto. Se muestra la más reciente de cada vehículo, con el conteo
-  // de las demás.
+  // de las demás. Con un filtro activo solo hay un vehículo, así que el
+  // agrupado no cambia nada visualmente pero reutiliza el mismo camino.
   const byVehicle = new Map<string, { vehicleName: string; latest: (typeof alerts)[number]; count: number }>();
   for (const a of alerts) {
     const existing = byVehicle.get(a.vehicleId);
@@ -37,6 +75,7 @@ export function AlertsPanel({ vehicles }: { vehicles: Vehicle[] }) {
 
   return (
     <div className="flex flex-col gap-2">
+      {filterBanner}
       <p className="text-xs text-slate-400">
         {alerts.length} alerta{alerts.length === 1 ? "" : "s"} en {grouped.length} vehículo
         {grouped.length === 1 ? "" : "s"}

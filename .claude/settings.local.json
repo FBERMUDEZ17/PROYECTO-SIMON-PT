@@ -13,7 +13,8 @@
       "Bash(netstat -ano)",
       "Bash(taskkill *)",
       "Bash(curl -s -m 90 -o /dev/null -w \"http_code:%{http_code} size:%{size_download}\\\\n\" \"http://localhost:8081/index.bundle?platform=android&dev=true\")",
-      "Bash(EXPO_TOKEN=\"1QCB-LycR4alVy3KF-fGfY2FpfYQ5zqCAtzWt_RK\" npx eas-cli whoami)"
+      "Bash(EXPO_TOKEN=\"1QCB-LycR4alVy3KF-fGfY2FpfYQ5zqCAtzWt_RK\" npx eas-cli whoami)",
+      "Bash(EXPO_TOKEN=\"1QCB-LycR4alVy3KF-fGfY2FpfYQ5zqCAtzWt_RK\" npx eas-cli build:view 00eee115-251d-4e87-8fa6-69762540c299)"
     ]
   }
 }
