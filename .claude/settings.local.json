@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(timeout 20 bash -c 'until curl -sf http://localhost:8080/auth/me -o /dev/null; do sleep 1; done; echo \"backend up\"')",
+      "Bash(curl -s -o /dev/null -w \"backend status: %{http_code}\\\\n\" http://localhost:8080/auth/me)",
+      "Bash(npx expo *)",
+      "Bash(curl -s -m 5 http://localhost:8081/status)",
+      "Bash(curl -s -m 120 -o /tmp/bundle.js -w \"http_code:%{http_code} size:%{size_download}\\\\n\" \"http://localhost:8081/index.bundle?platform=android&dev=true\")",
+      "Bash(npx tsc *)",
+      "Bash(npm view *)",
+      "Bash(npm install *)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(netstat -ano)",
+      "Bash(taskkill *)",
+      "Bash(curl -s -m 90 -o /dev/null -w \"http_code:%{http_code} size:%{size_download}\\\\n\" \"http://localhost:8081/index.bundle?platform=android&dev=true\")",
+      "Bash(EXPO_TOKEN=\"1QCB-LycR4alVy3KF-fGfY2FpfYQ5zqCAtzWt_RK\" npx eas-cli whoami)"
+    ]
+  }
+}

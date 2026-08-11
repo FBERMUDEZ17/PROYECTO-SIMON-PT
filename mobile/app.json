@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "Simon PT",
+    "slug": "proyecto-simon-pt-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#0f172a"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.simonpt.mobile",
+      "buildNumber": "1",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "fetch",
+          "remote-notification"
+        ]
+      }
+    },
+    "android": {
+      "package": "com.simonpt.mobile",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a"
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "plugins": [
+      "expo-notifications"
+    ],
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#0f172a"
+    },
+    "extra": {
+      "apiUrl": "http://localhost:8080",
+      "wsUrl": "ws://localhost:8080/ws",
+      "eas": {
+        "projectId": "58b929c6-e8ee-4464-a439-08beabbb1a13"
+      }
+    },
+    "owner": "freddy.bermudez"
+  }
+}
