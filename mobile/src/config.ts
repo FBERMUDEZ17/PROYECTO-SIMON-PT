@@ -26,7 +26,7 @@ export const DEFAULT_API_URL = process.env.EXPO_PUBLIC_API_URL ?? extra.apiUrl ?
 const BACKEND_URL_STORAGE_KEY = "@simonpt/backend_api_url";
 
 let currentApiUrl = DEFAULT_API_URL;
-let listeners: Array<() => void> = [];
+let listeners: (() => void)[] = [];
 
 export function getApiUrl(): string {
   return currentApiUrl;
