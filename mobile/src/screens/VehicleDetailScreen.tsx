@@ -8,12 +8,12 @@
 // sin ella, el MapView revienta nativo al montarse y tumba la app entera
 // (no es un error de JS capturable con error boundary). Hasta tener una
 // API key real, este link evita el crash sin perder la funcionalidad.
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { GestureResponderEvent } from "react-native";
 import {
   ActivityIndicator,
   Linking,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,6 +21,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import Svg, { Circle, G, Line, Polyline, Text as SvgText } from "react-native-svg";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import { useVehicles } from "@/hooks/useVehicles";
@@ -193,19 +194,33 @@ function ChartSection({
           </Text>
         )}
       </View>
-      <Sparkline readings={readings} values={values} color={color} unit={unit} />
+      <TrendLine readings={readings} values={values} color={color} unit={unit} />
     </View>
   );
 }
 
-// Sparkline minimalista sin dependencias de charting nativas (evita traer
-// recharts/victory-native solo para esto en el scaffold inicial), pero
-// "explorable": tocar una barra la selecciona y muestra su valor + hora
-// exacta arriba del gráfico. Las barras usan flex:1 (en vez de un ancho
-// fijo en px) para repartirse todo el ancho disponible del contenedor —
-// así el gráfico se adapta solo si el usuario rota el celular a horizontal
-// (más ancho disponible) sin dejar espacio vacío ni recortarse.
-function Sparkline({
+const CHART_HEIGHT = 90;
+const CHART_PADDING_X = 10;
+const CHART_PADDING_Y = 12;
+const CHART_TOP_LABEL_Y = 10;
+
+function shortDate(d: Date): string {
+  return d.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" });
+}
+
+function shortTime(d: Date): string {
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
+// Línea de tendencia con SVG (react-native-svg, ya era dependencia del
+// proyecto) en vez de barras: conecta todos los puntos del histórico y el
+// usuario puede arrastrar el dedo sobre ella para "recorrerla" — el
+// puntero (círculo + línea guía vertical) sigue al dedo en tiempo real, no
+// solo al tocar. El ancho se mide con onLayout (no useWindowDimensions
+// directo, que da el ancho de pantalla completo, no el del contenedor con
+// padding) así que se recalcula solo al rotar el celular o ampliar la
+// vista, sin dejar espacio vacío ni recortarse.
+function TrendLine({
   readings,
   values,
   color,
@@ -216,47 +231,129 @@ function Sparkline({
   color: string;
   unit: string;
 }) {
+  const [containerWidth, setContainerWidth] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
-  // Re-render en rotación: el ancho de las barras (flex) ya se recalcula
-  // solo vía layout, pero necesitamos que el componente vuelva a montar el
-  // gesto de selección con las dimensiones nuevas (evita un índice
-  // seleccionado que quede "pegado" visualmente al rotar).
-  const { width } = useWindowDimensions();
-  useEffect(() => setSelected(null), [width]);
+  const { width: screenWidth } = useWindowDimensions();
+  useEffect(() => setSelected(null), [screenWidth]);
 
   const max = Math.max(...values, 1);
   const min = Math.min(...values, 0);
   const range = Math.max(max - min, 1);
 
+  const points = useMemo(() => {
+    if (containerWidth === 0 || values.length === 0) return [];
+    const usableWidth = Math.max(1, containerWidth - CHART_PADDING_X * 2);
+    const usableHeight = CHART_HEIGHT - CHART_PADDING_Y * 2;
+    const step = values.length > 1 ? usableWidth / (values.length - 1) : 0;
+    return values.map((v, i) => ({
+      x: CHART_PADDING_X + (values.length > 1 ? i * step : usableWidth / 2),
+      y: CHART_PADDING_Y + usableHeight - ((v - min) / range) * usableHeight,
+    }));
+  }, [containerWidth, values, min, range]);
+
   const active = selected !== null ? selected : values.length - 1;
   const activeReading = readings[active];
   const activeValue = values[active];
+  const activePoint = points[active];
+
+  // Marca los puntos donde el histórico cruza a un día distinto del
+  // anterior — así, al arrastrar el puntero por una línea que puede cubrir
+  // varios días, queda claro en qué momento cambia el día sin tener que
+  // adivinarlo del reloj (que reinicia a las 00:00 y podría confundirse
+  // con "la misma tarde").
+  const dayBoundaries = useMemo(() => {
+    const boundaries: { x: number; label: string }[] = [];
+    for (let i = 1; i < readings.length; i++) {
+      const point = points[i];
+      if (!point) continue;
+      const prevDay = new Date(readings[i - 1].recorded_at).toDateString();
+      const day = new Date(readings[i].recorded_at).toDateString();
+      if (day !== prevDay) {
+        boundaries.push({ x: point.x, label: shortDate(new Date(readings[i].recorded_at)) });
+      }
+    }
+    return boundaries;
+  }, [points, readings]);
+
+  // Traduce la posición del dedo (locationX, relativa al propio contenedor
+  // gracias al responder system nativo) al índice de lectura más cercano —
+  // así el puntero recorre continuamente toda la línea mientras se arrastra,
+  // no solo al soltar sobre un punto exacto.
+  const updateFromTouch = useCallback(
+    (evt: GestureResponderEvent) => {
+      if (containerWidth === 0 || values.length === 0) return;
+      const x = evt.nativeEvent.locationX;
+      const usableWidth = Math.max(1, containerWidth - CHART_PADDING_X * 2);
+      const ratio = Math.min(1, Math.max(0, (x - CHART_PADDING_X) / usableWidth));
+      setSelected(Math.round(ratio * (values.length - 1)));
+    },
+    [containerWidth, values.length],
+  );
 
   return (
     <View>
       {activeReading && activeValue !== undefined && (
         <Text style={styles.sparkTooltip}>
           {activeValue.toFixed(1)}
-          {unit} · {new Date(activeReading.recorded_at).toLocaleTimeString()}
+          {unit} · {shortDate(new Date(activeReading.recorded_at))} {shortTime(new Date(activeReading.recorded_at))}
         </Text>
       )}
-      <View style={styles.sparkline}>
-        {values.map((v, i) => (
-          <Pressable key={i} style={styles.sparkCol} onPress={() => setSelected(i)}>
-            <View
-              style={[
-                styles.sparkBar,
-                {
-                  height: Math.max(4, ((v - min) / range) * 60),
-                  backgroundColor: color,
-                  opacity: i === active ? 1 : 0.55,
-                },
-              ]}
+      <View
+        style={styles.sparkline}
+        onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderGrant={updateFromTouch}
+        onResponderMove={updateFromTouch}
+      >
+        {containerWidth > 0 && points.length > 0 && (
+          <Svg width={containerWidth} height={CHART_HEIGHT}>
+            <Polyline
+              points={points.map((p) => `${p.x},${p.y}`).join(" ")}
+              fill="none"
+              stroke={color}
+              strokeWidth={2}
+              strokeLinejoin="round"
+              strokeLinecap="round"
             />
-          </Pressable>
-        ))}
+            {dayBoundaries.map((b, i) => (
+              <G key={i}>
+                <Line
+                  x1={b.x}
+                  y1={CHART_TOP_LABEL_Y + 4}
+                  x2={b.x}
+                  y2={CHART_HEIGHT}
+                  stroke={colors.textMuted}
+                  strokeWidth={1}
+                  strokeDasharray="2,3"
+                  opacity={0.6}
+                />
+                <SvgText x={b.x} y={CHART_TOP_LABEL_Y} fontSize="9" fill={colors.textMuted} textAnchor="middle">
+                  {b.label}
+                </SvgText>
+              </G>
+            ))}
+            {activePoint && (
+              <>
+                <Line
+                  x1={activePoint.x}
+                  y1={0}
+                  x2={activePoint.x}
+                  y2={CHART_HEIGHT}
+                  stroke={color}
+                  strokeWidth={1}
+                  strokeDasharray="4,4"
+                  opacity={0.4}
+                />
+                <Circle cx={activePoint.x} cy={activePoint.y} r={5} fill={color} stroke={colors.surface} strokeWidth={2} />
+              </>
+            )}
+          </Svg>
+        )}
       </View>
-      <Text style={styles.sparkHint}>Toca una barra para ver el valor exacto de ese momento.</Text>
+      <Text style={styles.sparkHint}>
+        Arrastra el dedo sobre la línea para recorrer cada valor. Las líneas punteadas marcan el cambio de día.
+      </Text>
     </View>
   );
 }
@@ -305,9 +402,7 @@ const styles = StyleSheet.create({
   },
   alertType: { color: colors.warning, fontWeight: "700", fontSize: 12 },
   alertMessage: { color: colors.text },
-  sparkline: { flexDirection: "row", alignItems: "flex-end", height: 60, width: "100%" },
-  sparkCol: { flex: 1, alignItems: "center", justifyContent: "flex-end", paddingHorizontal: 1 },
-  sparkBar: { width: "100%", borderRadius: 2, minWidth: 2 },
+  sparkline: { width: "100%", height: CHART_HEIGHT },
   sparkTooltip: { color: colors.text, fontSize: 12, fontWeight: "700", marginBottom: spacing(1) },
   sparkHint: { color: colors.textMuted, fontSize: 10, marginTop: spacing(1), textAlign: "center" },
 });
