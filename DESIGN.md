@@ -26,7 +26,7 @@ Los tres consumen la **misma API Go** — no hay lógica de negocio duplicada en
 
 - Cero infraestructura externa: no hay que levantar Postgres/MySQL para correr o evaluar el proyecto — `go run` ya deja todo funcionando.
 - `modernc.org/sqlite` es una implementación **pura Go** (sin cgo), lo que evita depender de un compilador C y simplifica el build multiplataforma (Windows incluido, que es donde se desarrolló esto).
-- El schema (`internal/db/db.go`) es un único bloque `CREATE TABLE IF NOT EXISTS` — no hay herramienta de migraciones porque el proyecto no la necesita a esta escala; los cambios de schema posteriores (ej. `owner_user_id`, `device_tokens`) se aplican con `ALTER TABLE` idempotentes en `migrate()`.
+- El schema (`internal/db/db.go`) es un único bloque `CREATE TABLE IF NOT EXISTS` — no hay herramienta de migraciones porque el proyecto no la necesita a esta escala; tablas nuevas (ej. `device_tokens`) simplemente se agregan a ese bloque, y solo las columnas añadidas a tablas ya existentes (ej. `owner_user_id` en `vehicles`, `speed_kmh` en `sensor_readings`) requieren `ALTER TABLE` idempotentes en `migrate()`.
 
 **Trade-off aceptado**: SQLite no escala a múltiples instancias de escritura concurrente (un solo archivo, locking a nivel de archivo). Para producción real con más de un nodo de backend, esto se reemplazaría por Postgres — el código de acceso a datos ya está aislado en `internal/*/store.go` por paquete, así que el cambio no tocaría la lógica de negocio.
 
@@ -45,6 +45,13 @@ Se eligió push real (WS) sobre polling porque el caso de uso es telemetría de 
 ## Enmascarado de `device_id` por rol
 
 Requisito: los usuarios no-admin no deben ver el identificador completo del dispositivo (`DEV-1234-XC54` → `DEV-****-XC54`). Se implementó en **dos puntos independientes** que deben mantenerse en sync manualmente (documentado en `CLAUDE.md`): las respuestas REST (`vehicles_handlers.go`) y los eventos WS (`ws/hub.go`). Se consideró centralizar en un único punto de serialización, pero REST y WS tienen ciclos de vida distintos (request/response vs conexión persistente con fan-out) — la duplicación consciente de una función pura (`vehicles.MaskDeviceID`, cubierta por test) fue más simple que introducir una capa de serialización compartida para dos casos.
+
+## Alta de vehículos por el admin (`POST /admin/vehicles`)
+
+Requisito: el admin necesita poder dar de alta un vehículo a nombre de un usuario puntual (por ejemplo, antes de que ese vehículo mande su primera lectura real desde el dispositivo). Decisiones:
+- **No se agregaron tablas ni columnas nuevas**: se reutiliza el mismo camino que `POST /sensors/data` (`telemetry.Service`, ahora con un método `CreateVehicle` que acepta un `owner_user_id` explícito en vez de inferirlo del usuario autenticado) — mismo pipeline de validación, persistencia y broadcast por WebSocket que la ingesta normal.
+- El propietario se elige de una lista real (`GET /admin/users`) en vez de tipear un ID a mano, para evitar asignar vehículos a un `user_id` inexistente por error de tipeo; el backend igual valida que el usuario exista antes de crear el vehículo.
+- Es **solo-admin** (`claims.IsAdmin()`, 403 si no) y **solo está expuesto en el dashboard web** (`web/src/app/dashboard/vehicles/new`) — no se implementó en la app mobile porque es una acción operativa/administrativa, no algo que un conductor necesite desde el vehículo.
 
 ## Predicción de autonomía de combustible
 

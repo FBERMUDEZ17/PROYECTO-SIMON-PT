@@ -28,7 +28,9 @@ Sirven tanto en el dashboard web como en la app mobile (misma API). Para desacti
 - **Autenticación JWT** (cookie `httpOnly` en web, token persistido en el dispositivo para mobile) con roles `admin`/`user`.
 - **Recuperación de contraseña** (flujo de dos pasos, token de un solo uso).
 - **Enmascarado de `device_id`** para usuarios no-admin (`DEV-1234-XC54` → `DEV-****-XC54`), tanto en REST como en WebSocket.
-- **Dashboard web**: mapa en vivo, lista/búsqueda de vehículos, gráficos históricos, panel de alertas (solo admin).
+- **Registro de dispositivos para push**: la app mobile registra su token de notificaciones (`POST /devices/register`) contra el usuario autenticado, para poder avisarle cuando se genere una alerta de uno de sus vehículos.
+- **Alta de vehículos por el admin**: en el dashboard web hay un botón **"+ Agregar vehículo"** (`web/src/app/dashboard/vehicles/new`) que llama a `POST /admin/vehicles` — el admin elige el usuario propietario (poblado desde `GET /admin/users`) y carga la primera lectura del vehículo nuevo. Es una acción exclusiva del rol admin y solo está disponible en el dashboard web (no en la app mobile).
+- **Dashboard web**: mapa en vivo, lista/búsqueda de vehículos, gráficos históricos, panel de alertas (solo admin), alta manual de vehículos (solo admin, ver punto anterior).
 - **App mobile**: mismas funcionalidades adaptadas a móvil — gráficas de línea de tendencia explorables (arrastrar el dedo muestra valor + fecha/hora, con marcadores de cambio de día), ubicación vía la app de mapas del sistema, notificaciones push, cache offline-first.
 
 ## Stack tecnológico
@@ -42,6 +44,26 @@ Sirven tanto en el dashboard web como en la app mobile (misma API). Para desacti
 | **Distribución mobile** | `mobile/eas.json` | EAS Build (perfil `preview`) → APK standalone instalable sin Expo Go |
 
 Ver [DESIGN.md](./DESIGN.md) para el razonamiento detrás de cada elección (por qué Go, por qué SQLite embebido, por qué WebSockets en vez de polling, etc.).
+
+## Endpoints principales
+
+| Método | Ruta | Acceso | Qué hace |
+|---|---|---|---|
+| `POST` | `/auth/register` | público | crea una cuenta (rol `user` siempre) |
+| `POST` | `/auth/login` | público | devuelve `{user, token}` y setea la cookie `auth_token` |
+| `POST` | `/auth/logout` | público | limpia la cookie |
+| `POST` | `/auth/forgot-password` | público | siempre responde 200; si el email existe, loguea el token de reseteo en el server |
+| `POST` | `/auth/reset-password` | público | `{token, new_password}` → actualiza la contraseña |
+| `GET` | `/ws` | autenticado (header/cookie/query token) | conexión WebSocket, eventos de telemetría/alertas en vivo |
+| `GET` | `/auth/me` | autenticado | usuario y rol del token actual |
+| `POST` | `/sensors/data` | autenticado | ingesta una lectura; crea el vehículo si es la primera (dueño = quien la manda) |
+| `GET` | `/vehicles` | autenticado | lista los vehículos del usuario (todos si es admin) |
+| `GET` | `/vehicles/{id}` | autenticado | detalle de un vehículo propio (404 si no es tuyo y no sos admin) |
+| `POST` | `/devices/register` | autenticado | registra el push token del dispositivo mobile actual |
+| `GET` | `/admin/users` | solo admin | lista usuarios registrados (para elegir propietario) |
+| `POST` | `/admin/vehicles` | solo admin | crea un vehículo + su primera lectura, asignado al `owner_user_id` elegido |
+
+Definición completa en `internal/httpapi/router.go`.
 
 ## Estructura del repo
 
@@ -96,6 +118,15 @@ Con el backend corriendo (`go run ./cmd/server`, puerto `8080` por defecto):
 4. **Provocar una alerta de combustible bajo** — mandar una lectura con `fuel_level` bajo tras una lectura previa reciente; la alerta aparece en el panel de alertas (visible solo para usuarios `admin`).
 
 5. **Roles**: un usuario registrado por su cuenta se crea como `user` (ve solo sus propios vehículos, con el `device_id` parcialmente enmascarado). No hay endpoint HTTP para autopromoverse a `admin` — para eso está la cuenta admin ya sembrada (`admin@simonpt.dev`, ver [Cuentas de prueba](#cuentas-de-prueba)); promover otra cuenta es un cambio a nivel de base de datos/código (`auth.Service.SetRole`), documentado en SETUP.md/DESIGN.md.
+
+6. **Alta de un vehículo como admin** — logueado como `admin@simonpt.dev`, en el dashboard web (`http://localhost:3000/dashboard/vehicles/new`) hay un botón **"+ Agregar vehículo"** que abre un formulario para elegir el usuario propietario (poblado desde `GET /admin/users`) y cargar la primera lectura del vehículo. Equivalente por API:
+   ```bash
+   curl -X POST http://localhost:8080/admin/vehicles \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer <token de admin>" \
+     -d '{"vehicle_id":"DEV-9999-AA11","owner_user_id":2,"lat":-33.45,"lon":-70.66,"fuel_level":80,"temperature_c":70,"speed_kmh":0}'
+   ```
+   Esta acción es exclusiva del rol admin y hoy solo existe en el dashboard web (no en la app mobile).
 
 Verificación end-to-end completa y solución de problemas: ver **[SETUP.md](./SETUP.md)**.
 

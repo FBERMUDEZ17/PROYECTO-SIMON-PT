@@ -83,7 +83,7 @@ Sirve para revisar toda la app (login, listado, detalle con posición/gráficas,
 ```bash
 cd mobile
 npm install
-# opcional: crear .env con EXPO_PUBLIC_API_URL / EXPO_PUBLIC_WS_URL apuntando a tu backend
+cp .env.example .env   # editar EXPO_PUBLIC_API_URL / EXPO_PUBLIC_WS_URL con la IP LAN de tu backend
 npx expo start
 ```
 
@@ -105,6 +105,7 @@ El perfil `preview` (`mobile/eas.json`) genera un `.apk` instalable directo (no 
 2. `POST /sensors/data` con un token de un usuario logueado → crea un vehículo nuevo y su primera lectura.
 3. Abrir el dashboard web (o la app mobile) logueado con ese mismo usuario → el vehículo debe aparecer con la lectura, y actualizarse en vivo por WebSocket si mandás una segunda lectura.
 4. Mandar una lectura con `fuel_level` bajo y una lectura previa reciente → debería dispararse una alerta de combustible bajo, visible en el panel de alertas.
+5. Loguearse como `admin@simonpt.dev` en el dashboard web y entrar a **"+ Agregar vehículo"** (`/dashboard/vehicles/new`) → el selector de propietario debe listar los usuarios registrados (`GET /admin/users`); al enviar el formulario se crea el vehículo con su primera lectura (`POST /admin/vehicles`) y aparece de inmediato en el listado, ya asignado al usuario elegido.
 
 ## Problemas comunes
 
