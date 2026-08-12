@@ -18,16 +18,24 @@ JWT_SECRET=un-secreto-cualquiera go run ./cmd/server
 | `DB_PATH` | `data/app.db` | Archivo SQLite (usar `:memory:` para pruebas descartables) |
 | `FRONTEND_ORIGIN` | `http://localhost:3000` | Orígenes permitidos por CORS (coma-separado) |
 | `COOKIE_SECURE` | `false` | Poner `true` solo detrás de HTTPS |
+| `SEED_DEMO_USERS` | `true` | Si es `false`, no crea las cuentas demo (ver abajo) al arrancar |
+
+Al arrancar, el servidor crea automáticamente (si no existen) dos cuentas de prueba — así se puede evaluar la vista admin sin registrarse ni tocar la base de datos:
+
+| Rol | Email | Contraseña |
+|---|---|---|
+| Admin | `admin@simonpt.dev` | `Admin123!` |
+| Usuario | `user@simonpt.dev` | `User123!` |
 
 Verificación rápida (con el server corriendo):
 
 ```bash
-curl -X POST http://localhost:8080/auth/register \
+curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"demo@example.com","password":"correct-pw","name":"Demo"}'
+  -d '{"email":"admin@simonpt.dev","password":"Admin123!"}'
 ```
 
-Debería devolver `{"user": {...}, "token": "..."}`.
+Debería devolver `{"user": {..., "role":"admin"}, "token": "..."}`.
 
 ### Correr los tests del backend
 
