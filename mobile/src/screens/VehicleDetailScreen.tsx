@@ -8,13 +8,26 @@
 // sin ella, el MapView revienta nativo al montarse y tumba la app entera
 // (no es un error de JS capturable con error boundary). Hasta tener una
 // API key real, este link evita el crash sin perder la funcionalidad.
-import { useMemo } from "react";
-import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import { useVehicles } from "@/hooks/useVehicles";
+import { useAuth } from "@/hooks/useAuth";
 import { colors, spacing } from "@/theme/theme";
 import type { MainStackParamList } from "@/navigation/types";
+import type { SensorReading } from "@/types/api";
 
 type Props = NativeStackScreenProps<MainStackParamList, "VehicleDetail">;
 
@@ -32,6 +45,10 @@ export function VehicleDetailScreen({ route }: Props) {
   // completa de datos y además se actualiza en vivo por WS.
   const { vehicles, loading, refresh } = useVehicles();
   const vehicle = useMemo(() => vehicles.find((v) => v.id === vehicleId), [vehicles, vehicleId]);
+  // TAREA: "sistema de alertas predictivas (solo admin visible)" — igual
+  // que web (que ni siquiera muestra esta sección a no-admins).
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   if (!vehicle && loading) {
     return (
@@ -76,40 +93,48 @@ export function VehicleDetailScreen({ route }: Props) {
             </Text>
             <Text style={styles.mapLinkCta}>Ver en Maps →</Text>
           </TouchableOpacity>
-          <Text style={styles.mapHint}>Se abre la app de Maps de tu teléfono. Para volver a Simon PT, usa el botón "atrás" de tu celular.</Text>
+          <Text style={styles.mapHint}>
+            Se abre la app de Maps de tu teléfono. Para volver a Simon PT, usa el botón &quot;atrás&quot; de tu
+            celular.
+          </Text>
         </>
       ) : (
         <Text style={[styles.muted, { marginTop: spacing(4) }]}>Todavía no llegaron lecturas de sensores.</Text>
       )}
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Alertas recientes</Text>
-        {vehicle.recent_alerts.length === 0 && <Text style={styles.muted}>Sin alertas.</Text>}
-        {vehicle.recent_alerts.map((a, i) => (
-          <View key={i} style={styles.alertRow}>
-            <Text style={styles.alertType}>{a.type}</Text>
-            <Text style={styles.alertMessage}>{a.message}</Text>
-          </View>
-        ))}
-      </View>
+      {isAdmin && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Alertas recientes</Text>
+          {vehicle.recent_alerts.length === 0 && <Text style={styles.muted}>Sin alertas.</Text>}
+          {vehicle.recent_alerts.map((a, i) => (
+            <View key={i} style={styles.alertRow}>
+              <Text style={styles.alertType}>{a.type}</Text>
+              <Text style={styles.alertMessage}>{a.message}</Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       {readings.length > 0 && (
         <>
           <ChartSection
             title="Combustible (histórico reciente)"
-            values={readings.map((r) => r.fuel_level)}
+            readings={readings}
+            getValue={(r) => r.fuel_level}
             color={colors.primary}
             unit="%"
           />
           <ChartSection
             title="Temperatura (histórico reciente)"
-            values={readings.map((r) => r.temperature_c)}
+            readings={readings}
+            getValue={(r) => r.temperature_c}
             color={colors.warning}
             unit="°C"
           />
           <ChartSection
             title="Velocidad (histórico reciente)"
-            values={readings.map((r) => r.speed_kmh)}
+            readings={readings}
+            getValue={(r) => r.speed_kmh}
             color={colors.success}
             unit=" km/h"
           />
@@ -144,15 +169,18 @@ function Stat({ label, value, color }: { label: string; value: string; color: st
 
 function ChartSection({
   title,
-  values,
+  readings,
+  getValue,
   color,
   unit,
 }: {
   title: string;
-  values: number[];
+  readings: SensorReading[];
+  getValue: (r: SensorReading) => number;
   color: string;
   unit: string;
 }) {
+  const values = useMemo(() => readings.map(getValue), [readings, getValue]);
   const last = values[values.length - 1];
   return (
     <View style={styles.section}>
@@ -165,25 +193,70 @@ function ChartSection({
           </Text>
         )}
       </View>
-      <Sparkline values={values} color={color} />
+      <Sparkline readings={readings} values={values} color={color} unit={unit} />
     </View>
   );
 }
 
 // Sparkline minimalista sin dependencias de charting nativas (evita traer
-// recharts/victory-native solo para esto en el scaffold inicial).
-function Sparkline({ values, color }: { values: number[]; color: string }) {
+// recharts/victory-native solo para esto en el scaffold inicial), pero
+// "explorable": tocar una barra la selecciona y muestra su valor + hora
+// exacta arriba del gráfico. Las barras usan flex:1 (en vez de un ancho
+// fijo en px) para repartirse todo el ancho disponible del contenedor —
+// así el gráfico se adapta solo si el usuario rota el celular a horizontal
+// (más ancho disponible) sin dejar espacio vacío ni recortarse.
+function Sparkline({
+  readings,
+  values,
+  color,
+  unit,
+}: {
+  readings: SensorReading[];
+  values: number[];
+  color: string;
+  unit: string;
+}) {
+  const [selected, setSelected] = useState<number | null>(null);
+  // Re-render en rotación: el ancho de las barras (flex) ya se recalcula
+  // solo vía layout, pero necesitamos que el componente vuelva a montar el
+  // gesto de selección con las dimensiones nuevas (evita un índice
+  // seleccionado que quede "pegado" visualmente al rotar).
+  const { width } = useWindowDimensions();
+  useEffect(() => setSelected(null), [width]);
+
   const max = Math.max(...values, 1);
   const min = Math.min(...values, 0);
   const range = Math.max(max - min, 1);
+
+  const active = selected !== null ? selected : values.length - 1;
+  const activeReading = readings[active];
+  const activeValue = values[active];
+
   return (
-    <View style={styles.sparkline}>
-      {values.map((v, i) => (
-        <View
-          key={i}
-          style={[styles.sparkBar, { height: Math.max(4, ((v - min) / range) * 60), backgroundColor: color }]}
-        />
-      ))}
+    <View>
+      {activeReading && activeValue !== undefined && (
+        <Text style={styles.sparkTooltip}>
+          {activeValue.toFixed(1)}
+          {unit} · {new Date(activeReading.recorded_at).toLocaleTimeString()}
+        </Text>
+      )}
+      <View style={styles.sparkline}>
+        {values.map((v, i) => (
+          <Pressable key={i} style={styles.sparkCol} onPress={() => setSelected(i)}>
+            <View
+              style={[
+                styles.sparkBar,
+                {
+                  height: Math.max(4, ((v - min) / range) * 60),
+                  backgroundColor: color,
+                  opacity: i === active ? 1 : 0.55,
+                },
+              ]}
+            />
+          </Pressable>
+        ))}
+      </View>
+      <Text style={styles.sparkHint}>Toca una barra para ver el valor exacto de ese momento.</Text>
     </View>
   );
 }
@@ -232,6 +305,9 @@ const styles = StyleSheet.create({
   },
   alertType: { color: colors.warning, fontWeight: "700", fontSize: 12 },
   alertMessage: { color: colors.text },
-  sparkline: { flexDirection: "row", alignItems: "flex-end", height: 60, gap: 2 },
-  sparkBar: { width: 4, borderRadius: 2 },
+  sparkline: { flexDirection: "row", alignItems: "flex-end", height: 60, width: "100%" },
+  sparkCol: { flex: 1, alignItems: "center", justifyContent: "flex-end", paddingHorizontal: 1 },
+  sparkBar: { width: "100%", borderRadius: 2, minWidth: 2 },
+  sparkTooltip: { color: colors.text, fontSize: 12, fontWeight: "700", marginBottom: spacing(1) },
+  sparkHint: { color: colors.textMuted, fontSize: 10, marginTop: spacing(1), textAlign: "center" },
 });

@@ -7,6 +7,7 @@ import { AlertsScreen } from "@/screens/AlertsScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
 import { VehicleDetailScreen } from "@/screens/VehicleDetailScreen";
 import { VehiclesProvider, useVehicles } from "@/hooks/useVehicles";
+import { useAuth } from "@/hooks/useAuth";
 import { LOW_FUEL_THRESHOLD_HOURS, HIGH_SPEED_THRESHOLD_KMH } from "@/types/api";
 import { colors } from "@/theme/theme";
 import type { MainStackParamList, MainTabParamList } from "./types";
@@ -72,6 +73,13 @@ function TabBadge({ count }: { count: number }) {
 
 function Tabs() {
   const { vehicles } = useVehicles();
+  // TAREA: "sistema de alertas predictivas (solo admin visible)" — igual
+  // que web/src/app/dashboard/page.tsx (user?.role === "admin"), la
+  // pestaña de Alertas solo se muestra a usuarios admin. Los datos ya
+  // vienen filtrados/no filtrados según el rol desde el backend, pero acá
+  // además ocultamos la navegación a la pantalla para no-admins.
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const alertCount = vehicles.reduce((sum, v) => sum + v.recent_alerts.length, 0);
   const attentionCount = vehicles.filter((v) => {
     const r = v.latest_reading;
@@ -96,19 +104,21 @@ function Tabs() {
           ),
         }}
       />
-      <Tab.Screen
-        name="Alerts"
-        component={AlertsScreen}
-        options={{
-          title: "Alertas",
-          tabBarIcon: ({ focused }) => (
-            <View>
-              <TabIcon glyph="🔔" focused={focused} />
-              <TabBadge count={alertCount} />
-            </View>
-          ),
-        }}
-      />
+      {isAdmin && (
+        <Tab.Screen
+          name="Alerts"
+          component={AlertsScreen}
+          options={{
+            title: "Alertas",
+            tabBarIcon: ({ focused }) => (
+              <View>
+                <TabIcon glyph="🔔" focused={focused} />
+                <TabBadge count={alertCount} />
+              </View>
+            ),
+          }}
+        />
+      )}
       <Tab.Screen
         name="Settings"
         component={SettingsScreen}

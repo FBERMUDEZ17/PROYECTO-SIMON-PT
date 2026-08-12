@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
 
 import { colors, spacing } from "@/theme/theme";
+import { useAuth } from "@/hooks/useAuth";
 import type { Vehicle } from "@/types/api";
 
 function fuelColor(level: number | undefined): string {
@@ -12,7 +13,14 @@ function fuelColor(level: number | undefined): string {
 
 export function VehicleCard({ vehicle, onPress }: { vehicle: Vehicle; onPress?: () => void }) {
   const reading = vehicle.latest_reading;
-  const hasAlert = vehicle.recent_alerts.length > 0;
+  // TAREA: "sistema de alertas predictivas (solo admin visible)" — igual
+  // que web (VehicleListPanel.tsx no deriva ningún indicador de
+  // vehicle.recent_alerts; solo usa umbrales locales de combustible/
+  // velocidad, visibles a cualquier usuario). El puntito rojo de acá
+  // salía de recent_alerts (dato admin-only), así que se oculta para
+  // no-admins en vez de exponer esa info fuera del panel de alertas.
+  const { user } = useAuth();
+  const hasAlert = user?.role === "admin" && vehicle.recent_alerts.length > 0;
 
   return (
     <View style={styles.card} accessible accessibilityRole="button" onTouchEnd={onPress}>
