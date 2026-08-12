@@ -58,7 +58,7 @@ Requisito: los usuarios no-admin no deben ver el identificador completo del disp
 - **Expo** (no React Native CLI puro) para evitar mantener proyectos nativos iOS/Android a mano en un repo que ya es multi-stack; `expo-notifications` da push funcional sin código nativo propio.
 - Para el **envío** de push desde el backend (`internal/push/expo.go`) se usa la **Expo Push API** en vez de integrar el Firebase Admin SDK directamente: el cliente ya obtiene un Expo push token (que envuelve FCM/APNs), y Expo entrega el mensaje final — esto evita que el backend necesite credenciales de un proyecto Firebase propio para que la funcionalidad sea probable de punta a punta.
 - **SQLite local** (`expo-sqlite`) para cache de vehículos + cola de lecturas pendientes, replicando offline-first lo que `web/src/lib/indexeddb.ts` hace en el navegador con IndexedDB — mismo patrón, tecnología nativa de cada plataforma.
-- Para la **entrega** (más allá de Expo Go, que no soporta módulos nativos custom como `react-native-maps`) se generó un build standalone real vía **EAS Build** (`mobile/eas.json`, perfil `preview` → APK instalable), documentado en SETUP.md.
+- Para la **entrega** (para que se pueda instalar directo sin Expo Go, sin depender de una API key de Google Maps ni otros módulos nativos custom) se generó un build standalone real vía **EAS Build** (`mobile/eas.json`, perfil `preview` → APK instalable), documentado en SETUP.md. La posición del vehículo se resuelve delegando a la app de mapas del sistema (`Linking.openURL` con esquema `geo:`) en vez de embeber un mapa nativo — evita el módulo nativo `react-native-maps`, que requiere una API key de Google Maps para no crashear en un build standalone.
 
 ## Testing: qué se cubrió y qué no
 

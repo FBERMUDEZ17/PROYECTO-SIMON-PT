@@ -70,7 +70,7 @@ Al abrir la app por primera vez, tocar **"⚙ Servidor"** en la pantalla de logi
 
 ### Opción B — Correr desde código fuente (Expo Go)
 
-Expo Go **no soporta `react-native-maps`** (requiere módulos nativos que Expo Go no trae) — el mapa de detalle del vehículo no va a cargar ahí. Sirve igual para revisar el resto de la app (login, listado, alertas, notificaciones locales).
+Sirve para revisar toda la app (login, listado, detalle con posición/gráficas, alertas, notificaciones locales) — no requiere módulos nativos custom (la posición del vehículo se muestra como link a Google/Apple Maps, no como mapa embebido).
 
 ```bash
 cd mobile
@@ -105,6 +105,6 @@ El perfil `preview` (`mobile/eas.json`) genera un `.apk` instalable directo (no 
 | `JWT_SECRET debe estar definido` al arrancar | Falta la env var | `JWT_SECRET=algo go run ./cmd/server` |
 | Web no puede loguear (CORS) | `FRONTEND_ORIGIN` no incluye tu origen | Setear `FRONTEND_ORIGIN=http://localhost:3000` (o el que uses) |
 | Mobile no conecta al backend | Apuntando a `localhost` desde un dispositivo físico/emulador | Usar la IP LAN de la PC (dispositivo físico) o `10.0.2.2` (emulador Android) |
-| APK da "Network request failed" incluso con la IP LAN bien puesta | Android 9+ (API 28+) bloquea tráfico `http://` sin cifrar por defecto | Ya resuelto en `mobile/app.json` (`android.usesCleartextTraffic: true`) — solo aplica en APKs compilados con esa versión o posterior; si compilás desde un `app.json` viejo, el error vuelve |
-| Expo Go dice "Something went wrong" | `react-native-maps` no soportado en Expo Go | Usar el APK standalone (Opción A) |
+| APK da "Network request failed" incluso con la IP LAN bien puesta | Android 9+ (API 28+) bloquea tráfico `http://` sin cifrar por defecto | Resuelto vía `expo-build-properties` en `mobile/app.json` (`android: { usesCleartextTraffic: true }`) — ojo: el key plano `android.usesCleartextTraffic` en la raíz **no** funciona en esta versión de Expo, se ignora en silencio; tiene que ir dentro del plugin `expo-build-properties` |
+| El APK se cierra solo (crash) al abrir el detalle de un vehículo | Histórico: `react-native-maps` sin API key de Google Maps configurada (necesaria en builds standalone de Android) | Ya no aplica — se removió `react-native-maps`; la posición ahora abre la app de mapas del sistema vía `Linking`, sin módulos nativos propios |
 | Expo Go dice "incompatible SDK version" | Tu Expo Go instalado no coincide con la SDK del proyecto (`mobile/app.json` → `expo.sdkVersion` implícito por la versión de `expo` en `package.json`, hoy 54) | Actualizar Expo Go desde la store, o bajar la SDK del proyecto para que coincida |

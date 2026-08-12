@@ -1,11 +1,15 @@
 // TAREA (mobile): "réplica del dashboard web" — detalle de un vehículo:
-// mapa con la última posición (equivalente mobile de
-// web/src/components/map/VehicleMap.tsx, con react-native-maps en vez de
-// maplibre-gl) + historial reciente (combustible/temperatura/velocidad,
+// última posición + historial reciente (combustible/temperatura/velocidad,
 // equivalente de web/src/components/charts/*) + alertas.
+//
+// La posición se muestra como link a Google/Apple Maps en vez de un mapa
+// embebido (react-native-maps): el mapa nativo requiere una API key de
+// Google Maps configurada en app.json para builds standalone de Android —
+// sin ella, el MapView revienta nativo al montarse y tumba la app entera
+// (no es un error de JS capturable con error boundary). Hasta tener una
+// API key real, este link evita el crash sin perder la funcionalidad.
 import { useMemo } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
-import MapView, { Marker } from "react-native-maps";
+import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import { useVehicles } from "@/hooks/useVehicles";
@@ -65,19 +69,14 @@ export function VehicleDetailScreen({ route }: Props) {
             <Stat label="Velocidad" value={`${reading.speed_kmh.toFixed(0)} km/h`} color={colors.success} />
           </View>
 
-          <View style={styles.mapWrap}>
-            <MapView
-              style={styles.map}
-              initialRegion={{
-                latitude: reading.lat,
-                longitude: reading.lon,
-                latitudeDelta: 0.05,
-                longitudeDelta: 0.05,
-              }}
-            >
-              <Marker coordinate={{ latitude: reading.lat, longitude: reading.lon }} title={vehicle.name} />
-            </MapView>
-          </View>
+          <TouchableOpacity style={styles.mapWrap} onPress={() => openInMaps(reading.lat, reading.lon, vehicle.name)}>
+            <Text style={styles.mapLinkTitle}>📍 Última posición conocida</Text>
+            <Text style={styles.muted}>
+              {reading.lat.toFixed(5)}, {reading.lon.toFixed(5)}
+            </Text>
+            <Text style={styles.mapLinkCta}>Ver en Maps →</Text>
+          </TouchableOpacity>
+          <Text style={styles.mapHint}>Se abre la app de Maps de tu teléfono. Para volver a Simon PT, usa el botón "atrás" de tu celular.</Text>
         </>
       ) : (
         <Text style={[styles.muted, { marginTop: spacing(4) }]}>Todavía no llegaron lecturas de sensores.</Text>
@@ -118,6 +117,20 @@ export function VehicleDetailScreen({ route }: Props) {
       )}
     </ScrollView>
   );
+}
+
+// openInMaps delega la ubicación a la app de mapas nativa del teléfono
+// (Google Maps en Android, Apple Maps en iOS) vía un intent/URL scheme
+// estándar del sistema operativo — no depende de ningún módulo nativo
+// propio, así que no puede tumbar la app.
+function openInMaps(lat: number, lon: number, label: string) {
+  const query = encodeURIComponent(label);
+  const url =
+    Platform.OS === "ios" ? `maps:0,0?q=${query}@${lat},${lon}` : `geo:${lat},${lon}?q=${lat},${lon}(${query})`;
+  Linking.openURL(url).catch(() => {
+    // Fallback universal si no hay app de mapas nativa instalada.
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${lat},${lon}`);
+  });
 }
 
 function Stat({ label, value, color }: { label: string; value: string; color: string }) {
@@ -197,7 +210,15 @@ const styles = StyleSheet.create({
   },
   statValue: { fontSize: 16, fontWeight: "700" },
   statLabel: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
-  mapWrap: { height: 220, borderRadius: 12, overflow: "hidden", marginTop: spacing(4) },
+  mapWrap: {
+    borderRadius: 12,
+    marginTop: spacing(4),
+    padding: spacing(4),
+    backgroundColor: colors.surface,
+  },
+  mapLinkTitle: { color: colors.text, fontWeight: "600", marginBottom: spacing(1) },
+  mapLinkCta: { color: colors.primary, fontWeight: "600", marginTop: spacing(2) },
+  mapHint: { color: colors.textMuted, fontSize: 11, marginTop: spacing(1), textAlign: "center" },
   map: { flex: 1 },
   section: { marginTop: spacing(5) },
   chartHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
