@@ -76,6 +76,72 @@ DESIGN.md           # decisiones de arquitectura y trade-offs
 SETUP.md            # guía de despliegue local paso a paso
 ```
 
+<details>
+<summary><strong>Detalle de <code>internal/</code> (backend)</strong></summary>
+
+```
+internal/
+  db/          # apertura de SQLite + schema (CREATE TABLE) + migrate()
+  auth/        # registro/login, JWT, roles, recuperación de contraseña
+  sensors/     # validación de lecturas + predicción de autonomía (regresión lineal)
+  vehicles/    # catálogo de vehículos, ownership, enmascarado de device_id
+  alerts/      # persistencia y deduplicación (15 min) de alertas
+  devices/     # registro de push tokens del cliente mobile
+  push/        # envío de notificaciones vía Expo Push API
+  telemetry/   # orquesta sensors+vehicles+alerts en cada ingesta (Service.Ingest)
+  ws/          # Hub de WebSocket (fan-out + enmascarado por rol en renderForRole)
+  httpapi/     # router (chi), handlers HTTP, middleware de auth
+```
+
+</details>
+
+<details>
+<summary><strong>Detalle de <code>web/src/</code> (dashboard Next.js, App Router)</strong></summary>
+
+```
+web/src/
+  app/                    # rutas (App Router): login, forgot/reset-password,
+                           #   dashboard, dashboard/vehicles/new (alta admin)
+  components/
+    auth/                 # formularios de login/registro
+    dashboard/             # layout general del panel
+    map/                   # VehicleMap.tsx (maplibre-gl)
+    charts/                 # gráficos históricos (Recharts)
+    alerts/                 # panel de alertas (solo admin)
+    layout/, providers/, ui/  # shell, providers de TanStack Query, componentes base
+  hooks/
+    useAuth.ts             # sesión/rol actual
+    useVehicles.ts         # REST de vehículos (TanStack Query)
+    useAdmin.ts             # GET /admin/users y POST /admin/vehicles
+    useLiveVehicles.ts, useRealtimeEvents.ts  # estado en vivo vía WebSocket
+    useOnlineStatus.ts      # detecta conexión perdida (fallback a cache)
+  lib/
+    api.ts                  # único fetch wrapper (credentials: "include", wsURL())
+    indexeddb.ts             # cache offline-first (idb)
+    chartTime.ts              # formateo de fechas/horas para los gráficos
+  types/                    # tipos TS compartidos con las respuestas del backend
+```
+
+</details>
+
+<details>
+<summary><strong>Detalle de <code>mobile/src/</code> (app React Native / Expo)</strong></summary>
+
+```
+mobile/src/
+  screens/       # LoginScreen, RegisterScreen, ForgotPasswordScreen,
+                  #   DashboardScreen, VehicleDetailScreen, AlertsScreen, SettingsScreen
+  navigation/     # React Navigation (stack + tabs)
+  api/            # client.ts — llamadas REST/WS al mismo backend Go
+  hooks/          # equivalentes mobile de los hooks web (auth, vehículos, tiempo real)
+  storage/        # db.ts (expo-sqlite), vehiclesCache.ts, offlineQueue.ts (cache/cola offline-first)
+  notifications/  # push.ts — registro de token Expo Push (POST /devices/register)
+  components/     # UI reutilizable (incluye la gráfica de línea táctil)
+  theme/, types/, utils/
+```
+
+</details>
+
 ## Requisitos de instalación
 
 - **Go 1.26+**
